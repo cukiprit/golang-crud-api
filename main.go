@@ -24,6 +24,7 @@ func main() {
 	uc := controller.NewUsersController(db)
 
 	router.GET("/", tc.GetAllTodos)
+	router.POST("/todos", tc.CreateTodo)
 	router.POST("/login", uc.Login)
 	router.POST("/register", uc.Register)
 
