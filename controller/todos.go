@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"learn/api/models"
 	"net/http"
 
@@ -20,58 +21,54 @@ func NewTodosController(db *gorm.DB) *TodosController {
 func (todocontroller *TodosController) GetAllTodos(c *gin.Context) {
 	var todos []models.Todo
 	if err := todocontroller.db.Find(&todos).Error; err != nil {
-		c.AbortWithStatus(500)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "No records found"})
 		return
 	}
 	c.JSON(200, todos)
 }
 
-type CreateTodoRequest struct {
-	Title       string `json:"title" binding:"required"`
-	Description string `json:"description" binding:"required"`
-	Status      string `json:"status" binding:"required"`
-}
-
 func (todocontroller *TodosController) CreateTodo(c *gin.Context) {
-	var request CreateTodoRequest
-	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
-		return
-	}
-
+	// Get the user ID from the jwt token
 	tokenString := c.GetHeader("Authorization")
-	if tokenString == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing authorization token"})
-		return
-	}
+	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+		// Verify that the signing method is correct
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected singing method: %v", t.Header["alg"])
+		}
 
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		return []byte("secretkey"), nil
+		// Get the secret key from environtment variable or configuration file
+		secretKey := []byte("secretkey")
+
+		return secretKey, nil
 	})
+
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization token"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok || !token.Valid {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization token"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
-	userID := claims["sub"].(float64)
+	// Type assertion to get user ID as float64
+	userID := claims["user_id"].(float64)
 
-	todo := models.Todo{
-		Title:       request.Title,
-		Description: request.Description,
-		Status:      request.Status,
-		UserID:      uint(userID),
-	}
-
-	if err := todocontroller.db.Create(&todo).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create todo"})
+	// Get the request body and create a new Todo object
+	var newTodo models.Todo
+	if err := c.ShouldBindJSON(&newTodo); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "the data is invalid"})
 		return
 	}
 
-	c.JSON(http.StatusCreated, todo)
+	// Set the user ID for the new todo
+	newTodo.UserID = uint(userID)
+
+	// Insert the new todo into the database
+	todocontroller.db.Create(&newTodo)
+
+	// Return the new todo in the response
+	c.JSON(http.StatusCreated, newTodo)
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"learn/api/config"
 	"learn/api/controller"
+	"learn/api/middleware"
 	"learn/api/seeder"
 	"log"
 
@@ -24,7 +25,7 @@ func main() {
 	uc := controller.NewUsersController(db)
 
 	router.GET("/", tc.GetAllTodos)
-	router.POST("/todos", tc.CreateTodo)
+	router.POST("/todos", middleware.AuthMiddleware(), tc.CreateTodo)
 	router.POST("/login", uc.Login)
 	router.POST("/register", uc.Register)
 

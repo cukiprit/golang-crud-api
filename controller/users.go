@@ -73,6 +73,8 @@ func (usercontroller *UserController) Login(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create token"})
 	}
 
+	c.Header("Authorization", "Bearer "+token)
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "User authenticated successfully",
 		"user_id": token,
